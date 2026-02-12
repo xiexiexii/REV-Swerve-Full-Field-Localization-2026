@@ -4,6 +4,10 @@
 
 package frc.robot;
 
+import com.pathplanner.lib.path.PathConstraints;
+
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.util.Units;
@@ -84,18 +88,62 @@ public final class Constants {
     public static final int kDriverControllerPort = 0;
     public static final double kDriveDeadband = 0.1;
 
-    public static final int k_A = XboxController.Button.kA.value;
-    public static final int k_B = XboxController.Button.kB.value;
-    public static final int k_X = XboxController.Button.kX.value;
-    public static final int k_Y = XboxController.Button.kY.value;
+    public static final int kStart = XboxController.Button.kStart.value;
+
+    public static final int kA = XboxController.Button.kA.value;
+    public static final int kB = XboxController.Button.kB.value;
+    public static final int kX = XboxController.Button.kX.value;
+    public static final int kY = XboxController.Button.kY.value;
+
+    public static final int kDpadRight = 90; // D-Pad Right
+    public static final int kDpadLeft = 270; // D-Pad Left
   }
 
   // Auto stuff
   public static final class AutoConstants {
+
+    // For PathFinding
+    public static final PathConstraints kconstraints = new PathConstraints(
+      3.0, 
+      4.0,
+      Units.degreesToRadians(540), 
+      Units.degreesToRadians(720)
+    );
   }
 
   // LED Stuff
   public static final class LEDConstants {
-    public static final int blinkinPort = 0;  
+    public static final int kBlinkinPort = 0;  
+  }
+
+  public static final class VisionConstants {
+    // Name
+    public static final String kLimelightFrontLeftName = "limelight-orange";
+    public static final String kLimelightFrontRightName = "limelight-yellow";
+    public static final String kLimelightBackLeftName = "limelight-green";
+    public static final String kLimelightBackRightName = "limelight-blue";
+
+    // PID for Tag Relative Control in General
+    public static final double kPAim = 0.06;
+    public static final double kIAim = 0.000;
+    public static final double kDAim = 0.008;
+
+    public static final double kPRange = 0.14;
+    public static final double kIRange = 0.0;
+    public static final double kDRange = 0.0;
+
+    public static final double kPStrafe = 0.22;
+    public static final double kIStrafe = 0.0;
+    public static final double kDStrafe = 0.0;
+
+    // Tag Reject Distance
+    public static final int kRejectionDistance = 4;
+
+    // Tag Reject Rotation Rate
+    public static final int kRejectionRotationRate = 720;
+  }
+
+  public static final class LocalizationConstants {
+    public static final Pose2d kRedReefKL = new Pose2d(13.97, 1.97, Rotation2d.fromDegrees(112));  
   }
 }

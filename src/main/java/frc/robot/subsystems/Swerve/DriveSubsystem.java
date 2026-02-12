@@ -4,28 +4,39 @@
 
 package frc.robot.subsystems.Swerve;
 
+import java.util.List;
+
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import com.pathplanner.lib.path.GoalEndState;
+import com.pathplanner.lib.path.PathConstraints;
+import com.pathplanner.lib.path.PathPlannerPath;
+import com.pathplanner.lib.path.Waypoint;
 import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
 
 import edu.wpi.first.hal.HAL;
 import edu.wpi.first.hal.FRCNetComm.tInstances;
 import edu.wpi.first.hal.FRCNetComm.tResourceType;
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
-import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.DriveConstants;
+import frc.robot.Constants.VisionConstants;
+import frc.robot.subsystems.Limelight.LimelightHelpers;
+import frc.robot.subsystems.Limelight.Localization;
 
 // Drive Subsystem Class yay
 public class DriveSubsystem extends SubsystemBase {
@@ -62,17 +73,21 @@ public class DriveSubsystem extends SubsystemBase {
     m_backLeft,
     m_backRight
   };
- 
-  // Change to NavXComType.kUSB2 if using the other USB port
-  // No other USB connections are allowed if using NavX USB
-  // for reliability reasons. NO CANIVORE.
-  private final AHRS m_gyro = new AHRS(NavXComType.kUSB1); 
+
+  // Creates the Gyro for Swerve Magic
+  private final AHRS m_gyro = new AHRS(NavXComType.kMXP_SPI);
 
   // Default rotation for reference (PathPlanner)
   private Rotation2d rawGyroRotation = new Rotation2d();
 
-  // Odometry - Tracks robot pose
-  SwerveDriveOdometry m_odometry = new SwerveDriveOdometry(
+  // Field2D for Telemetry Data (Limelight)
+  private final Field2d m_field = new Field2d();
+
+  // Red Alliance sees forward as 180 degrees, Blue Alliance sees as 0 (Limelight)
+  public static int AllianceYaw;
+
+  // Swerve PoseEstimator - Tracks robot pose
+  private SwerveDrivePoseEstimator m_poseEstimator = new SwerveDrivePoseEstimator(
     DriveConstants.kDriveKinematics, 
     Rotation2d.fromDegrees(-m_gyro.getYaw()), 
     new SwerveModulePosition[] {
@@ -80,7 +95,8 @@ public class DriveSubsystem extends SubsystemBase {
       m_frontRight.getPosition(),
       m_backLeft.getPosition(),
       m_backRight.getPosition()
-    }
+    },
+    new Pose2d()
   );
   
   // Robot Config for PathPlanner
@@ -104,7 +120,7 @@ public class DriveSubsystem extends SubsystemBase {
 
     AutoBuilder.configure(
       this::getPose, // Robot pose supplier
-      this::setPose, // Method to reset odometry (will be called if your auto has a starting pose)
+      this::setPose, // Method to reset poseEstimator (will be called if your auto has a starting pose)
       () -> DriveConstants.kDriveKinematics.toChassisSpeeds(getModuleStates()), // ChassisSpeeds supplier. MUST BE ROBOT RELATIVE
       this::runVelocity, // Method that will drive the robot given ROBOT RELATIVE ChassisSpeeds. Also optionally outputs individual module feedforwards
         new PPHolonomicDriveController( // PPHolonomicController is the built in path following controller for holonomic drive trains
@@ -129,35 +145,131 @@ public class DriveSubsystem extends SubsystemBase {
   }
 
   // This method will be called once per scheduler run
-  // Periodically update the odometry
+  // Periodically update the poseEstimator
   public void periodic() {
-    m_odometry.update(
+    m_poseEstimator.update(
       Rotation2d.fromDegrees(-m_gyro.getYaw()), 
       new SwerveModulePosition[] {
         m_frontLeft.getPosition(),
         m_frontRight.getPosition(),
         m_backLeft.getPosition(),
         m_backRight.getPosition()
-      });
+      }
+    );
+    
+    // Updates using LL
+    updateVisionMeasurements();
 
       // Puts Yaw + Angle on Smart Dashboard
       SmartDashboard.putNumber("NavX Yaw", -m_gyro.getYaw());
-      // SmartDashboard.putNumber("NavX Angle", -m_gyro.getAngle());
+      SmartDashboard.putNumber("NavX Angle", m_gyro.getAngle());
+      // SmartDashboard.putNumberArray("Bot Pose Target Space", NetworkTableInstance.getDefault().getTable(VisionConstants.kLimelightName).getEntry("botpose_targetspace").getDoubleArray(new double[6]));
+      // SmartDashboard.putNumber("Bot Pose 4", NetworkTableInstance.getDefault().getTable(VisionConstants.kLimelightName).getEntry("botpose_targetspace").getDoubleArray(new double[6])[4]);
+      // SmartDashboard.putBoolean(VisionConstants.kLimelightName + "-tag-in-vision", LimelightHelpers.getTV(VisionConstants.kLimelightName));
+  }
+
+  // Updates poseEstimate with the Limelight Readings using MT2 
+  public void updateVisionMeasurements() {
+
+    // Setting Yaw to Compensate for Red Alliance Limelight Localization
+    var alliance = DriverStation.getAlliance();
+    if (alliance.isPresent()) {
+      if (alliance.get() == DriverStation.Alliance.Red) {
+        AllianceYaw = 180;
+      }
+      else if (alliance.get() == DriverStation.Alliance.Blue){
+        AllianceYaw = 0;
+      }
+    }
+
+    // For each limelight...
+    for (Localization.LimelightPoseEstimateWrapper estimateWrapper : Localization.getPoseEstimates(getHeading())) {
+
+      // If there is a tag in view and the pose estimate is valid...
+      if (estimateWrapper.tiv && poseEstimateIsValid(estimateWrapper.poseEstimate)) {
+
+        // Add the vision measurement to the swerve drive
+        m_poseEstimator.addVisionMeasurement(estimateWrapper.poseEstimate.pose,
+          estimateWrapper.poseEstimate.timestampSeconds,
+          estimateWrapper.getStdvs(estimateWrapper.poseEstimate.avgTagDist));
+
+        // Update position on Field2d
+        m_field.setRobotPose(estimateWrapper.poseEstimate.pose);
+        SmartDashboard.putData("Localization/Field", m_field);
+        SmartDashboard.putNumber("Localization/Local X",estimateWrapper.poseEstimate.pose.getX());
+        SmartDashboard.putNumber("Localization/Local Y",estimateWrapper.poseEstimate.pose.getY());
+      }
+    }
+    
+    m_field.setRobotPose(m_poseEstimator.getEstimatedPosition());
+    SmartDashboard.putNumber("local x", m_poseEstimator.getEstimatedPosition().getX());
+    SmartDashboard.putNumber("local y", m_poseEstimator.getEstimatedPosition().getY());
+  }
+
+  // Check if pose estimate is valid
+  private boolean poseEstimateIsValid(LimelightHelpers.PoseEstimate estimate) {
+    return estimate != null && Math.abs(getTurnRate()) < VisionConstants.kRejectionRotationRate
+      && estimate.avgTagDist < VisionConstants.kRejectionDistance;
+  }
+
+  // TODO: [NOT CONFIRMED] Pathfinds to pose and avoids obstacles in the way
+  public void pathfindToPose(Pose2d targetPose, PathConstraints constraints) {
+    Command pathfindingCommand = AutoBuilder.pathfindToPose(
+      targetPose, 
+      constraints, 
+      0.0
+    );
+    pathfindingCommand.schedule();
+  } 
+
+   // TODO: [NOT CONFIRMED] Pathfinds to path and then follows that path
+   public void pathfindThenFollowPath(String path, PathConstraints constraints) {
+    try {
+      PathPlannerPath m_path = PathPlannerPath.fromPathFile(path);
+      Command pathfindingCommand = AutoBuilder.pathfindThenFollowPath(
+      m_path, 
+      constraints
+    );
+    pathfindingCommand.schedule();
+    }
+    catch(Exception e) {
+      e.printStackTrace();
+    }
+  } 
+
+  // Drives to pose in the shortest way possible without considering obstacles
+  public void goToDesiredPose(Pose2d desiredPose){
+
+    // Create a list of waypoints from poses. Each pose represents one waypoint.
+    // The rotation component of the pose should be the direction of travel. Do not use holonomic rotation.
+    List<Waypoint> waypoints = PathPlannerPath.waypointsFromPoses(
+      getPose(),
+      desiredPose
+    );
+
+    // Create the path using the waypoints created above
+    PathPlannerPath path = new PathPlannerPath(
+      waypoints,
+      AutoConstants.kconstraints,
+      null, // The ideal starting state, this is only relevant for pre-planned paths, so can be null for on-the-fly paths.
+      new GoalEndState(0, desiredPose.getRotation()) 
+    );
+    AutoBuilder.followPath(path).schedule();
   }
 
   // Returns currently estimated pose of robot
   public Pose2d getPose() {
-    return m_odometry.getPoseMeters();
+    return m_poseEstimator.getEstimatedPosition();
   }
 
   // Sets pose for robot (PathPlanner)
   public void setPose(Pose2d pose) {
-    m_odometry.resetPosition(rawGyroRotation, getModulePositions(), pose);
+    m_poseEstimator.resetPosition(rawGyroRotation, getModulePositions(), pose);
   }
 
-  // Resets odometry to specified pose
-  public void resetOdometry(Pose2d pose) {
-    m_odometry.resetPosition(
+  // Resets poseEstimator to specified pose
+  public void resetPoseEstimator(Pose2d pose) {
+    m_poseEstimator.resetPosition(
       Rotation2d.fromDegrees(-m_gyro.getYaw()), 
       new SwerveModulePosition[] {
         m_frontLeft.getPosition(),
@@ -267,6 +379,7 @@ public class DriveSubsystem extends SubsystemBase {
   public double getHeading() {
     return Rotation2d.fromDegrees(-m_gyro.getYaw()).getDegrees();
   }
+
 
   // Returns Robot Turn Rate, in degrees per second
   public double getTurnRate() {

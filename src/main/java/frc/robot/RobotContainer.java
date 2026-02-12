@@ -2,18 +2,15 @@
 
 package frc.robot;
 
-import com.pathplanner.lib.auto.NamedCommands;
-
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.ControllerConstants;
-import frc.robot.commands.LEDColorChangeCommand;
-import frc.robot.subsystems.LEDSubsystem;
 import frc.robot.subsystems.Swerve.DriveSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 
 // This class is where the bulk of the robot should be declared.  Since Command-based is a
@@ -24,12 +21,11 @@ import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 public class RobotContainer {
 
   // Robot's Subsystems
-  private final DriveSubsystem m_robotDrive = new DriveSubsystem();
-  private final LEDSubsystem m_LEDSubsystem = new LEDSubsystem();
+  public static final DriveSubsystem m_robotDrive = new DriveSubsystem();
   SendableChooser<Command> m_chooser = new SendableChooser<>();
 
   // Controllers
-  XboxController m_driverController = new XboxController(ControllerConstants.kDriverControllerPort);
+  CommandXboxController m_driverController = new CommandXboxController(ControllerConstants.kDriverControllerPort);
 
   // The container for the robot. Contains subsystems, OI devices, and commands.
   public RobotContainer() {
@@ -56,7 +52,7 @@ public class RobotContainer {
     SmartDashboard.putData("AutoMode", m_chooser);
 
     // Named Command Configuration
-    NamedCommands.registerCommand("Change LED Color", new LEDColorChangeCommand(m_LEDSubsystem));
+    // NamedCommands.registerCommand("Change LED Color", new LEDColorChangeCommand(m_LEDSubsystem));
 
     // Autos
     m_chooser.addOption("Curvy yay", m_robotDrive.getAuto("Curvy yay"));
@@ -65,8 +61,14 @@ public class RobotContainer {
   // Define Button and Axis bindings here
   private void configureButtonBindings() {
 
+    // Zero Gyro - Start Button
+    new JoystickButton(m_driverController.getHID(), ControllerConstants.kStart)
+    .onTrue(
+      new InstantCommand(() -> m_robotDrive.zeroHeading(), m_robotDrive)
+    );
+
     // Sets wheels in an X position to prevent movement - A
-    new JoystickButton(m_driverController, ControllerConstants.k_A)
+    new JoystickButton(m_driverController.getHID(), ControllerConstants.kA)
       .whileTrue(new RunCommand(() -> m_robotDrive.setX(), m_robotDrive)
     );
   }
