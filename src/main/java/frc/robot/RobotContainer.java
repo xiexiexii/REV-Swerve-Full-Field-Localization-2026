@@ -5,7 +5,9 @@ package frc.robot;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.ControllerConstants;
+import frc.robot.Constants.PoseConstants;
 import frc.robot.subsystems.Swerve.DriveSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
@@ -70,6 +72,11 @@ public class RobotContainer {
     // Sets wheels in an X position to prevent movement - A
     new JoystickButton(m_driverController.getHID(), ControllerConstants.kA)
       .whileTrue(new RunCommand(() -> m_robotDrive.setX(), m_robotDrive)
+    );
+
+    // TODO: Pathfind to Pose 
+    new JoystickButton(m_driverController.getHID(), ControllerConstants.kB)
+      .onTrue(new InstantCommand(() -> m_robotDrive.pathfindToPose(PoseConstants.kRedTrenchLeftAlliance, AutoConstants.kconstraints), m_robotDrive)
     );
   }
 

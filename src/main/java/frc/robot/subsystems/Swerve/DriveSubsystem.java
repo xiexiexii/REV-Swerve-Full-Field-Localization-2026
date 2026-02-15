@@ -162,7 +162,7 @@ public class DriveSubsystem extends SubsystemBase {
 
       // Puts Yaw + Angle on Smart Dashboard
       SmartDashboard.putNumber("NavX Yaw", -m_gyro.getYaw());
-      SmartDashboard.putNumber("NavX Angle", m_gyro.getAngle());
+      // SmartDashboard.putNumber("NavX Angle", m_gyro.getAngle());
       // SmartDashboard.putNumberArray("Bot Pose Target Space", NetworkTableInstance.getDefault().getTable(VisionConstants.kLimelightName).getEntry("botpose_targetspace").getDoubleArray(new double[6]));
       // SmartDashboard.putNumber("Bot Pose 4", NetworkTableInstance.getDefault().getTable(VisionConstants.kLimelightName).getEntry("botpose_targetspace").getDoubleArray(new double[6])[4]);
       // SmartDashboard.putBoolean(VisionConstants.kLimelightName + "-tag-in-vision", LimelightHelpers.getTV(VisionConstants.kLimelightName));
@@ -187,6 +187,8 @@ public class DriveSubsystem extends SubsystemBase {
 
       // If there is a tag in view and the pose estimate is valid...
       if (estimateWrapper.tiv && poseEstimateIsValid(estimateWrapper.poseEstimate)) {
+        // && (estimateWrapper.poseEstimate.pose.getTranslation().getDistance(m_poseEstimator.getEstimatedPosition().getTranslation()) < 0.5 || 
+        //   estimateWrapper.poseEstimate.pose.getTranslation().getDistance(m_poseEstimator.getEstimatedPosition().getTranslation()) > 5)) { // TODO: This is a bandaid
 
         // Add the vision measurement to the swerve drive
         m_poseEstimator.addVisionMeasurement(estimateWrapper.poseEstimate.pose,
@@ -194,21 +196,25 @@ public class DriveSubsystem extends SubsystemBase {
           estimateWrapper.getStdvs(estimateWrapper.poseEstimate.avgTagDist));
 
         // Update position on Field2d
-        m_field.setRobotPose(estimateWrapper.poseEstimate.pose);
-        SmartDashboard.putData("Localization/Field", m_field);
-        SmartDashboard.putNumber("Localization/Local X",estimateWrapper.poseEstimate.pose.getX());
-        SmartDashboard.putNumber("Localization/Local Y",estimateWrapper.poseEstimate.pose.getY());
+        // m_field.setRobotPose(estimateWrapper.poseEstimate.pose);
+        // SmartDashboard.putNumber("Localization/Local X",estimateWrapper.poseEstimate.pose.getX());
+        // SmartDashboard.putNumber("Localization/Local Y",estimateWrapper.poseEstimate.pose.getY());
       }
     }
     
+    // Update pos on Field2d
     m_field.setRobotPose(m_poseEstimator.getEstimatedPosition());
-    SmartDashboard.putNumber("local x", m_poseEstimator.getEstimatedPosition().getX());
-    SmartDashboard.putNumber("local y", m_poseEstimator.getEstimatedPosition().getY());
+    SmartDashboard.putData("Localization/Field", m_field);
+
+    // Localization values
+    SmartDashboard.putNumber("Fused Local X", m_poseEstimator.getEstimatedPosition().getX());
+    SmartDashboard.putNumber("Fused Local Y", m_poseEstimator.getEstimatedPosition().getY());
   }
 
   // Check if pose estimate is valid
   private boolean poseEstimateIsValid(LimelightHelpers.PoseEstimate estimate) {
-    return estimate != null && Math.abs(getTurnRate()) < VisionConstants.kRejectionRotationRate
+    return estimate != null 
+      && Math.abs(getTurnRate()) < VisionConstants.kRejectionRotationRate
       && estimate.avgTagDist < VisionConstants.kRejectionDistance;
   }
 

@@ -137,13 +137,13 @@ public final class Constants {
     public static final double kDStrafe = 0.0;
 
     // Tag Reject Distance
-    public static final int kRejectionDistance = 4;
+    public static final double kRejectionDistance = 4;
 
     // Tag Reject Rotation Rate
     public static final int kRejectionRotationRate = 720;
   }
 
-  public static final class LocalizationConstants {
-    public static final Pose2d kRedReefKL = new Pose2d(13.97, 1.97, Rotation2d.fromDegrees(112));  
+  public static final class PoseConstants {
+    public static final Pose2d kRedTrenchLeftAlliance = new Pose2d(14, 2.5, Rotation2d.fromDegrees(180));  
   }
 }

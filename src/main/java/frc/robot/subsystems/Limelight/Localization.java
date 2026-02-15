@@ -9,8 +9,8 @@ import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.RobotContainer;
 import frc.robot.Constants.VisionConstants;
+import frc.robot.RobotContainer;
 import frc.robot.subsystems.Swerve.DriveSubsystem;
 import frc.robot.utils.SmartDashboardNumber;
 
@@ -69,17 +69,17 @@ public class Localization extends SubsystemBase {
 
   // The X, Y, Theta standard deviations for each LL
   private static double[][] limelightStdvs = {
-    {0.8, 0.8, 9999},
-    {0.8, 0.8, 9999},
-    {0.8, 0.8, 9999},
-    {0.8, 0.8, 9999}
+    {1.2, 1.2, 2},
+    {1.2, 1.2, 2},
+    {1.2, 1.2, 2},
+    {1.2, 1.2, 2}
   };
 
   // Array of the Estimator Wrappers
   private static LimelightPoseEstimateWrapper[] wrappers;
 
   // Denominator for the stdv calculation
-  private static SmartDashboardNumber stdvDenominator = new SmartDashboardNumber("Stdv Denominator Scale", 30);
+  private static SmartDashboardNumber stdvDenominator = new SmartDashboardNumber("Stdv Denominator Scale", 30); //30
 
   // Initializes the each of the Limelights on the robots into the wrapper
   public static void initialize() {
@@ -114,8 +114,17 @@ public class Localization extends SubsystemBase {
     // Updates wrapper variables for each Limelight
     for (int i = 0; i < limelightNames.length; i++) {
       String name = limelightNames[i];
+
+      // Sets the orientation using the external IMU
       LimelightHelpers.SetRobotOrientation(name, headingDegrees + DriveSubsystem.AllianceYaw, RobotContainer.m_robotDrive.getTurnRate(), 0, 0, 0, 0);
-      wrappers[i].withPoseEstimate(LimelightHelpers.getBotPoseEstimate_wpiBlue(name))
+      
+      // Use internal IMU + external IMU
+      LimelightHelpers.SetIMUMode(name, 4);
+      
+      // Controls the correction speed
+      LimelightHelpers.SetIMUAssistAlpha(name, 0.001);
+
+      wrappers[i].withPoseEstimate(LimelightHelpers.getBotPoseEstimate_wpiBlue(name)) // TODO: Verify
         .withTagInVision(LimelightHelpers.getTV(name));
     }
     return wrappers;
@@ -187,7 +196,7 @@ public class Localization extends SubsystemBase {
       this.limelightName = name;
       
       // Default standard deviation values
-      double[] stdvDefVals = new double[] {0.8, 0.8, 9999};
+      double[] stdvDefVals = new double[] {0.8, 0.8, 2};
 
       // For the specific limelight, update stdvs
       for (int i = 0; i < Localization.limelightNames.length; i++) {
